@@ -1,0 +1,2 @@
+[worker-zone-detection.mp4](https://github.com/intel-iot-devkit/sample-videos/blob/master/worker-zone-detection.mp4)
+[Safety_Full_Hat_and_Vest.mp4](https://github.com/intel-iot-devkit/safety-gear-detector-python/blob/master/resources/Safety_Full_Hat_and_Vest.mp4)
