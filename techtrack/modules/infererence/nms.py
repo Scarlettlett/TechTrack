@@ -24,7 +24,6 @@ def filter(bboxes, class_ids, scores, nms_iou_threshold):
         # height = int(bbox[3])
         boxes_cv2.append([x, y, width, height])
 
-    # boxes_cv2 = np.array(boxes_cv2)
     indices = cv2.dnn.NMSBoxes(boxes_cv2, scores, score_threshold=0.0, nms_threshold=nms_iou_threshold)
 
     if len(indices) > 0:

@@ -13,7 +13,8 @@ def compute_mse(assigned_predictions):
     mse = 0
     for object in assigned_predictions:
         pred_bbox = np.array(object[1:5])
-        # Predicted box and true box have overlap more than the iou threshold
+        # If associated, len(assigned_predictions)=9 
+        # [pred_class, pred_x, pred_y, pred_w, pred_h, class_prob, objectiveness_score, true_class, true_bbox]
         if len(object) == 9:
             true_bbox = np.array(object[-1])
             mse += np.mean((pred_bbox - true_bbox) ** 2)
@@ -51,7 +52,7 @@ def compute_loss(predictions, annotations, iou_threshold=0.6):
 
 
 # Identify hard images based on the total loss for all objects in each image
-def sample_hard_negatives(prediction_dir: str, annotation_dir: str, num_samples: int):
+def sample_hard_negatives(prediction_dir: str, annotation_dir: str, num_samples: int, iou_threshold=0.6):
     image_losses = []
 
     # Iterate through each file in the prediction directory
@@ -69,7 +70,7 @@ def sample_hard_negatives(prediction_dir: str, annotation_dir: str, num_samples:
             annotations = load_txt_file(annotation_path)
 
             # Compute total loss for this image
-            total_loss = compute_loss(predictions, annotations, iou_threshold=0.6)
+            total_loss = compute_loss(predictions, annotations, iou_threshold=iou_threshold)
 
             # Store the file and its loss
             image_losses.append((pred_file, total_loss))

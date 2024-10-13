@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 import json
+from copy import deepcopy
 
 class Model:
     def __init__(self, model_config, model_weights, class_names):
@@ -41,24 +42,22 @@ class Model:
         return predictions
     
 
-    def post_process(self, predict_output, score_threshold):
+    def post_process(self, predict_output, objectiveness_threshold=0.5):
         bboxes = []
         class_ids = []
         scores = []
 
         for output in predict_output:
             for detection in output:
-                # print(f"Detection: {detection}")
+                prob_list = detection[5:] # Probabilities for classes
 
-                scores_list = detection[5:] # Probabilities for classes
-
-                if scores_list.size == 0:  # Check if the scores_list is empty
+                if prob_list.size == 0:  # Check if the scores_list is empty
                     continue  # Skip this detection if no class probabilities are available
 
-                class_id = np.argmax(scores_list) # take class id for highest probability
-                confidence = scores_list[class_id]
+                class_id = np.argmax(prob_list) # take class id for highest probability
+                objectiveness = detection[4]
 
-                if confidence > score_threshold:
+                if objectiveness > objectiveness_threshold:
                     # Extract bounding box when threshold is met
                     center_x, center_y, box_width, box_height = detection[0:4]
                     bbox = [center_x, center_y, box_width, box_height]
@@ -70,9 +69,9 @@ class Model:
                     #         bboxes[existing_index] = bbox
                     #         scores[existing_index] = confidence
                     # else:
-                    bboxes.append([center_x, center_y, box_width, box_height])
+                    bboxes.append(bbox)
                     class_ids.append(class_id)
-                    scores.append(float(confidence))
+                    scores.append(float(objectiveness))
 
         return bboxes, class_ids, scores
 
@@ -96,9 +95,9 @@ def pred_raw_data(images, image_names, yolo_model, objective_threshold=0.3):
             for detection in output:
                 bbox = detection[0:4]
                 objectness = detection[4]
-                scores_list = detection[5:]  # Class probabilities
-                class_id = np.argmax(scores_list)
-                class_prob = scores_list[class_id]
+                prob_list = detection[5:]  # Class probabilities
+                class_id = np.argmax(prob_list)
+                class_prob = prob_list[class_id]
 
                 # Only save prediction information for highly objectiveness score
                 if objectness > objective_threshold:
@@ -155,6 +154,26 @@ def load_txt_file(file_path):
             data.append(values)
     return data
 
+# Function designed to read certain images' txt files
+# def load_txt_file(folder_path, image_names):
+#     image_info = {}
+
+#     # Loop through all files in the directory
+#     for file_name in image_names:
+#         # Build full path to the ground truth file
+#         txt_file_path = os.path.join(folder_path, file_name)
+            
+#         # Read the ground truth annotations from the file
+#         try:
+#             with open(txt_file_path, 'r') as file:
+#                 annotations = file.readlines()
+#             # Store the annotations for this image
+#             image_info[file_name] = [np.array(list(map(float, line.strip().split()))) for line in annotations]
+#         except FileNotFoundError:
+#             print(f"File not found: {txt_file_path}")
+
+#     return image_info
+
 
 # Define IoU (Intersection over Union) for model comparison metric
 def calculate_iou(box1, box2):
@@ -196,7 +215,7 @@ def match_box(box1, box2, iou_threshold=0.6):
 
 
 def assign_true_object(predictions, annotations, iou_threshold=0.6):
-    assigned_predictions = predictions
+    assigned_predictions = deepcopy(predictions)
     for object in assigned_predictions:
         pred_bbox = object[1:5]
         for true_obj in annotations:
@@ -206,6 +225,8 @@ def assign_true_object(predictions, annotations, iou_threshold=0.6):
                 true_class = true_obj[0]
                 object.append(true_class)
                 object.append(true_bbox)
+    # If associated, len(assigned_predictions)=9 
+    # [pred_class, pred_x, pred_y, pred_w, pred_h, class_prob, objectiveness_score, true_class, true_bbox]
     return assigned_predictions
 
 
