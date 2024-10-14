@@ -5,7 +5,7 @@ import sys
 import os
 module_path = os.path.abspath(os.path.join('..'))
 sys.path.append(module_path)
-from modules.infererence.object_detection import *
+from infererence.object_detection import *
 
 
 # Compute the Mean Squared Error between the predicted and ground truth bboxes
@@ -26,7 +26,7 @@ def compute_mse(assigned_predictions):
 
 
 # Calculate cross entropy loss for classification
-def calculate_entropy_loss(assigned_predictions):
+def calculate_entropy_loss(assigned_predictions, epsilon=1e-10):
     entropy_loss = 0
     for object in assigned_predictions:
         # Predicted box and true box have overlap more than the iou threshold
@@ -34,7 +34,7 @@ def calculate_entropy_loss(assigned_predictions):
             # Check if predicted class agree to true class
             if object[0] == object[-2]:
                 # Use class probabilities for cross entropy loss calculation
-                entropy_loss += -np.log(object[5])
+                entropy_loss += -np.log(object[5] + epsilon)
         
     return entropy_loss
 
@@ -52,8 +52,11 @@ def compute_loss(predictions, annotations, iou_threshold=0.6):
 
 
 # Identify hard images based on the total loss for all objects in each image
-def sample_hard_negatives(prediction_dir: str, annotation_dir: str, num_samples: int, iou_threshold=0.6):
+def sample_hard_negatives(prediction_dir: str, annotation_dir: str, num_samples: int, iou_threshold=0.6, loss_threshold=1):
     image_losses = []
+    hard_negative_count = 0
+    total_images = 0
+    cumulative_loss = 0
 
     # Iterate through each file in the prediction directory
     for pred_file in os.listdir(prediction_dir):
@@ -72,8 +75,23 @@ def sample_hard_negatives(prediction_dir: str, annotation_dir: str, num_samples:
             # Compute total loss for this image
             total_loss = compute_loss(predictions, annotations, iou_threshold=iou_threshold)
 
+            cumulative_loss += total_loss
+
+            # Increment hard negative count if loss is above the threshold
+            if total_loss > loss_threshold:
+                hard_negative_count += 1
+
             # Store the file and its loss
             image_losses.append((pred_file, total_loss))
+            total_images += 1
+
+    # Calculate the average loss across all images
+    average_loss = cumulative_loss / total_images if total_images > 0 else 0
+    print(f"Average Loss: {average_loss:.4f}")
+
+    # Calculate the hard negative error rate
+    hard_negative_error_rate = hard_negative_count / total_images if total_images > 0 else 0
+    print(f"Hard Negative Error Rate: {hard_negative_error_rate:.2%}")
 
     # Sort the images by total loss (descending order)
     image_losses.sort(key=lambda x: x[1], reverse=True)
